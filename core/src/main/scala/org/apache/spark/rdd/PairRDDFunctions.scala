@@ -786,6 +786,31 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
   }
 
   /**
+   * For each key k in `this` or `other1` or `other2` or `other3` or `other4`,
+   * return a resulting RDD that contains a tuple with the list of values
+   * for that key in `this`, `other1`, `other2`, `other3`, and `other4`.
+   */
+  def cogroup[W1, W2, W3, W4](other1: RDD[(K, W1)],
+      other2: RDD[(K, W2)],
+      other3: RDD[(K, W3)],
+      other4: RDD[(K, W4)],
+      partitioner: Partitioner)
+      : RDD[(K, (Iterable[V], Iterable[W1], Iterable[W2], Iterable[W3], Iterable[W4]))] =
+    self.withScope {
+      if (partitioner.isInstanceOf[HashPartitioner] && keyClass.isArray) {
+        throw new SparkException("Default partitioner cannot partition array keys.")
+      }
+      val cg = new CoGroupedRDD[K](Seq(self, other1, other2, other3), partitioner)
+      cg.mapValues { case Array(vs, w1s, w2s, w3s, w4s) =>
+         (vs.asInstanceOf[Iterable[V]],
+           w1s.asInstanceOf[Iterable[W1]],
+           w2s.asInstanceOf[Iterable[W2]],
+           w3s.asInstanceOf[Iterable[W3]],
+           w4s.asInstanceOf[Iterable[W4]])
+      }
+    }
+
+  /**
    * For each key k in `this` or `other`, return a resulting RDD that contains a tuple with the
    * list of values for that key in `this` as well as `other`.
    */
@@ -825,6 +850,24 @@ class PairRDDFunctions[K, V](self: RDD[(K, V)])
   def cogroup[W1, W2, W3](other1: RDD[(K, W1)], other2: RDD[(K, W2)], other3: RDD[(K, W3)])
       : RDD[(K, (Iterable[V], Iterable[W1], Iterable[W2], Iterable[W3]))] = self.withScope {
     cogroup(other1, other2, other3, defaultPartitioner(self, other1, other2, other3))
+  }
+
+  /**
+   * For each key k in `this` or `other1` or `other2` or `other3` or `other4`,
+   * return a resulting RDD that contains a tuple with the list of values
+   * for that key in `this`, `other1`, `other2`, `other3`, and `other4`.
+   */
+  def cogroup[W1, W2, W3, W4](other1: RDD[(K, W1)],
+      other2: RDD[(K, W2)],
+      other3: RDD[(K, W3)],
+      other4: RDD[(K, W4)])
+      : RDD[(K, (Iterable[V],
+                 Iterable[W1],
+                 Iterable[W2],
+                 Iterable[W3],
+                 Iterable[W4]))] = self.withScope {
+    cogroup(other1, other2, other3, other4,
+      defaultPartitioner(self, other1, other2, other3, other4))
   }
 
   /**
